@@ -1,0 +1,830 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lane Catcher (Rules + BGM + SFX)</title>
+  <style>
+    :root{
+      --w: 420px;
+      --h: 720px;
+      --laneGap: 14px;
+      --pad: 18px;
+      --ui: rgba(255,255,255,.85);
+      --ink: #151515;
+    }
+    *{ box-sizing:border-box; }
+    body{
+      margin:0;
+      min-height:100svh;
+      display:grid;
+      place-items:center;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 15% 20%, rgba(255, 99, 132, .55), transparent 45%),
+        radial-gradient(circle at 85% 25%, rgba(54, 162, 235, .55), transparent 45%),
+        radial-gradient(circle at 25% 85%, rgba(255, 206, 86, .55), transparent 45%),
+        radial-gradient(circle at 80% 85%, rgba(75, 192, 192, .55), transparent 45%),
+        linear-gradient(135deg, #7c3aed, #22c55e);
+      overflow:hidden;
+    }
+    .wrap{
+      width:min(var(--w), 92vw);
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+      user-select:none;
+    }
+    .topbar{
+      display:flex;
+      gap:10px;
+      align-items:center;
+      justify-content:space-between;
+      padding: 12px 14px;
+      background: var(--ui);
+      border-radius: 14px;
+      box-shadow: 0 12px 28px rgba(0,0,0,.18);
+      backdrop-filter: blur(10px);
+    }
+    .badge{
+      display:flex;
+      gap:12px;
+      align-items:baseline;
+      font-weight:900;
+      flex-wrap:wrap;
+    }
+    .badge small{ font-weight:800; opacity:.65; }
+    .btns{ display:flex; gap:8px; }
+    button{
+      border:0;
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-weight:900;
+      cursor:pointer;
+      background: #111827;
+      color:#fff;
+      box-shadow: 0 10px 22px rgba(0,0,0,.2);
+      transition: transform .08s ease;
+    }
+    button:active{ transform: translateY(1px) scale(.99); }
+
+    .game{
+      position:relative;
+      height: min(var(--h), 70svh);
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.18), rgba(255,255,255,.05)),
+        radial-gradient(circle at 30% 30%, rgba(255,255,255,.22), transparent 45%),
+        radial-gradient(circle at 70% 70%, rgba(255,255,255,.16), transparent 50%);
+      border-radius: 18px;
+      overflow:hidden;
+      box-shadow: 0 18px 44px rgba(0,0,0,.25);
+      border: 2px solid rgba(255,255,255,.25);
+    }
+    .lanes{
+      position:absolute; inset:0;
+      display:grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: var(--laneGap);
+      padding: var(--pad);
+      pointer-events:none;
+    }
+    .lane{
+      border-radius: 14px;
+      background: rgba(255,255,255,.10);
+      outline: 1px dashed rgba(255,255,255,.22);
+      outline-offset: -8px;
+    }
+
+    .player{
+      position:absolute;
+      bottom: 22px;
+      width: 92px;
+      height: 70px;
+      border-radius: 18px;
+      display:grid;
+      place-items:center;
+      font-size: 34px;
+      font-weight: 1000;
+      color:#111;
+      background: linear-gradient(135deg, #60a5fa, #a78bfa);
+      box-shadow: 0 16px 28px rgba(0,0,0,.25);
+      border: 2px solid rgba(255,255,255,.5);
+      transition: left .12s ease, transform .12s ease;
+    }
+    .player.bump{ transform: scale(1.04); }
+    .player::after{
+      content:"";
+      position:absolute;
+      inset: -10px -14px -16px -14px;
+      border-radius: 24px;
+      background: radial-gradient(circle at 50% 40%, rgba(255,255,255,.35), transparent 55%);
+      z-index:-1;
+      filter: blur(2px);
+      opacity:.7;
+    }
+
+    .box{
+      position:absolute;
+      top:-90px;
+      width: 92px;
+      height: 74px;
+      border-radius: 14px;
+      display:grid;
+      place-items:center;
+      font-weight: 1000;
+      font-size: 22px;
+      letter-spacing: .3px;
+      color: rgba(20,20,20,.95);
+      border: 2px solid rgba(255,255,255,.55);
+      box-shadow: 0 18px 30px rgba(0,0,0,.25);
+      transform: rotate(-2deg);
+    }
+    .box.negative{ color: rgba(255,255,255,.92); }
+    .box.locked{ opacity:.55; filter: saturate(.6); }
+
+    .speedTag{
+      position:absolute;
+      bottom: 6px;
+      right: 8px;
+      font-size: 11px;
+      font-weight: 900;
+      padding: 2px 6px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.26);
+      border: 1px solid rgba(255,255,255,.32);
+      color: rgba(255,255,255,.92);
+      text-shadow: 0 6px 14px rgba(0,0,0,.25);
+    }
+
+    .floatText{
+      position:absolute;
+      font-weight: 1000;
+      pointer-events:none;
+      animation: floatUp .7s ease-out forwards;
+      text-shadow: 0 10px 22px rgba(0,0,0,.25);
+      color: rgba(255,255,255,.95);
+    }
+    @keyframes floatUp{
+      0%{ transform: translateY(0) scale(1); opacity:1; }
+      100%{ transform: translateY(-44px) scale(1.1); opacity:0; }
+    }
+
+    .overlay{
+      position:absolute; inset:0;
+      display:grid;
+      place-items:center;
+      background: rgba(10,10,25,.55);
+      backdrop-filter: blur(6px);
+      color:#fff;
+      text-align:center;
+      padding: 24px;
+      gap: 14px;
+      opacity: 0;
+      pointer-events:none;
+      transition: opacity .2s ease;
+    }
+    .overlay.show{
+      opacity: 1;
+      pointer-events:auto;
+    }
+    .overlay h2{
+      margin:0;
+      font-size: 28px;
+      letter-spacing: .3px;
+    }
+    .overlay p{
+      margin:0;
+      opacity:.92;
+      line-height:1.55;
+    }
+
+    .help{
+      opacity:.8;
+      font-size: 12px;
+      text-align:center;
+    }
+    .kbd{
+      display:inline-block;
+      padding: 2px 8px;
+      border-radius: 8px;
+      background: rgba(255,255,255,.2);
+      border: 1px solid rgba(255,255,255,.25);
+      font-weight: 900;
+    }
+
+    .charPick{
+      display:grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
+      margin-top: 14px;
+    }
+    .charBtn{
+      background: rgba(255,255,255,.12);
+      border: 1px solid rgba(255,255,255,.25);
+      color:#fff;
+      padding: 12px 10px;
+      border-radius: 14px;
+      cursor:pointer;
+      font-weight: 950;
+      box-shadow: 0 12px 26px rgba(0,0,0,.18);
+      transition: transform .08s ease, background .12s ease;
+    }
+    .charBtn:active{ transform: translateY(1px) scale(.99); }
+    .charBtn.selected{
+      background: rgba(255,255,255,.28);
+      border-color: rgba(255,255,255,.55);
+    }
+    .charEmoji{
+      font-size: 28px;
+      display:block;
+      margin-bottom: 6px;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div class="badge">
+        <div>Score: <span id="score">100</span></div>
+        <small>Waves: <span id="wavesLeft">20</span> left</small>
+        <small>BGM: <span id="bgmState">OFF</span></small>
+      </div>
+      <div class="btns">
+        <button id="startBtn">Start</button>
+        <button id="resetBtn">Reset</button>
+      </div>
+    </div>
+
+    <div class="game" id="game">
+      <div class="lanes">
+        <div class="lane"></div><div class="lane"></div><div class="lane"></div>
+      </div>
+
+      <div class="player" id="player" aria-label="player">🤖</div>
+
+      <div class="overlay" id="overlay">
+        <div>
+          <h2 id="overlayTitle">キャラクターを選んでね</h2>
+          <p id="overlayText">
+            <span class="kbd">←</span> / <span class="kbd">→</span>で移動。<br>
+            1ウェーブ3箱同時（同速）。1ウェーブで当たれるのは1箱だけ。<br>
+            ウェーブ10/15は全マイナス！（1つは軽傷、2つは重傷）
+          </p>
+
+          <div class="charPick" id="charPick">
+            <button class="charBtn selected" data-char="robot">
+              <span class="charEmoji">🤖</span>ロボット
+            </button>
+            <button class="charBtn" data-char="cat">
+              <span class="charEmoji">🐱</span>ネコ
+            </button>
+            <button class="charBtn" data-char="car">
+              <span class="charEmoji">🏎️</span>スポーツカー
+            </button>
+          </div>
+
+          <div style="margin-top:14px">
+            <button id="overlayBtn">Start</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="help">
+      操作：<span class="kbd">←</span> / <span class="kbd">→</span>（左・中央・右の3レーン）
+    </div>
+  </div>
+
+<script>
+(() => {
+  const game = document.getElementById('game');
+  const player = document.getElementById('player');
+  const scoreEl = document.getElementById('score');
+  const wavesLeftEl = document.getElementById('wavesLeft');
+  const bgmStateEl = document.getElementById('bgmState');
+  const startBtn = document.getElementById('startBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const overlay = document.getElementById('overlay');
+  const overlayTitle = document.getElementById('overlayTitle');
+  const overlayText = document.getElementById('overlayText');
+  const overlayBtn = document.getElementById('overlayBtn');
+  const charPick = document.getElementById('charPick');
+
+  // ====== 設定 ======
+  const totalWaves = 20;
+  const FAST_TEMPO_START_WAVE = 16; // 最後の5ウェーブ
+  const SPECIAL_WAVES_ALL_NEG = new Set([10, 15]);
+
+  let laneIndex = 1;
+  let score = 100;
+  let wavesLeft = totalWaves;
+  let currentWave = 0;     // 1..20
+  let running = false;
+  let rafId = null;
+
+  // 1ウェーブで1回しか当たれない制御
+  let activeWaveId = 0;
+  let waveHitLocked = false;
+
+  // ====== キャラ ======
+  const chars = {
+    robot: { emoji: '🤖', bg: 'linear-gradient(135deg, #60a5fa, #a78bfa)' },
+    cat:   { emoji: '🐱', bg: 'linear-gradient(135deg, #fde047, #fb7185)' },
+    car:   { emoji: '🏎️', bg: 'linear-gradient(135deg, #34d399, #22c55e)' },
+  };
+  let selectedChar = 'robot';
+  function applyChar(){
+    player.textContent = chars[selectedChar].emoji;
+    player.style.background = chars[selectedChar].bg;
+  }
+
+  // ====== レーン位置 ======
+  function laneX(idx){
+    const rect = game.getBoundingClientRect();
+    const pad = 18;
+    const gap = 14;
+    const usable = rect.width - pad*2 - gap*2;
+    const laneW = usable / 3;
+    return pad + idx * (laneW + gap) + laneW/2;
+  }
+  function setPlayerLane(idx){
+    laneIndex = Math.max(0, Math.min(2, idx));
+    const x = laneX(laneIndex);
+    player.style.left = `${x - player.offsetWidth/2}px`;
+  }
+
+  // ====== UI ======
+  function setScore(v){ score = v; scoreEl.textContent = score; }
+  function setWavesLeft(v){ wavesLeft = v; wavesLeftEl.textContent = wavesLeft; }
+
+  // ====== 乱数 ======
+  function randInt(min, max){
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+  }
+  function randBgHue(){
+    const a = randInt(0, 360);
+    const b = (a + randInt(40, 140)) % 360;
+    return `linear-gradient(135deg, hsl(${a} 90% 65%), hsl(${b} 90% 62%))`;
+  }
+
+  // ====== 速度（ウェーブごとに1つ） ======
+  const speedModes = [
+    { key:'slow',   label:'遅い', base: 190 },
+    { key:'normal', label:'普通', base: 270 },
+    { key:'fast',   label:'速い', base: 360 },
+  ];
+  function pickSpeed(){
+    return speedModes[randInt(0, speedModes.length - 1)];
+  }
+
+  // ====== 生成 ======
+  function spawnBox(lane, value, speedObj, waveId){
+    const el = document.createElement('div');
+    el.className = 'box ' + (value < 0 ? 'negative' : 'positive');
+    el.textContent = (value >= 0 ? `+${value}` : `${value}`);
+    el.dataset.value = String(value);
+    el.dataset.lane = String(lane);
+    el.dataset.waveId = String(waveId);
+    el.dataset.collectable = "1";
+
+    el.style.background = randBgHue();
+    el.dataset.vps = String(speedObj.base);
+
+    const tag = document.createElement('div');
+    tag.className = 'speedTag';
+    tag.textContent = speedObj.label;
+    el.appendChild(tag);
+
+    el.style.left = `${laneX(lane) - 92/2}px`;
+    el.style.top = `-90px`;
+
+    game.appendChild(el);
+    return el;
+  }
+
+  // ウェーブの値生成ルール
+  // - 通常：1つマイナス(-10..-1), 2つは0..50
+  // - 特別(10/15)：3つ全部マイナス。1つは-1..-9、2つは-49..-30
+  function generateWaveValues(waveNo){
+    const vals = [0,0,0];
+
+    if (SPECIAL_WAVES_ALL_NEG.has(waveNo)){
+      const lightLane = randInt(0,2);
+      vals[lightLane] = -randInt(1,9); // -1..-9
+
+      // 残り2つ：-30..-49
+      for (let lane=0; lane<3; lane++){
+        if (lane === lightLane) continue;
+        vals[lane] = -randInt(30,49); // -30..-49
+      }
+      return vals;
+    }
+
+    // 通常ウェーブ
+    const negLane = randInt(0,2);
+    vals[negLane] = -randInt(1,10); // -1..-10（= -10..-1）
+
+    for (let lane=0; lane<3; lane++){
+      if (lane === negLane) continue;
+      vals[lane] = randInt(0,50);
+    }
+    return vals;
+  }
+
+  function spawnWave(waveNo){
+    activeWaveId++;
+    waveHitLocked = false;
+
+    const waveId = activeWaveId;
+    const speedObj = pickSpeed(); // ★3箱同速
+
+    const values = generateWaveValues(waveNo);
+    for (let lane=0; lane<3; lane++){
+      spawnBox(lane, values[lane], speedObj, waveId);
+    }
+  }
+
+  // ====== エフェクト ======
+  function showFloatText(text, x, y){
+    const t = document.createElement('div');
+    t.className = 'floatText';
+    t.textContent = text;
+    t.style.left = `${x}px`;
+    t.style.top = `${y}px`;
+    game.appendChild(t);
+    setTimeout(() => t.remove(), 800);
+  }
+  function bumpPlayer(){
+    player.classList.add('bump');
+    setTimeout(() => player.classList.remove('bump'), 120);
+  }
+
+  // ====== WebAudio（BGM + SFX） ======
+  let audio = null;
+
+  function createAudio(){
+    const AC = window.AudioContext || window.webkitAudioContext;
+    const ctx = new AC();
+
+    const master = ctx.createGain();
+    master.gain.value = 0.12;
+    master.connect(ctx.destination);
+
+    const leadGain = ctx.createGain(); leadGain.gain.value = 0.7; leadGain.connect(master);
+    const drumGain = ctx.createGain(); drumGain.gain.value = 0.7; drumGain.connect(master);
+    const hatGain  = ctx.createGain(); hatGain.gain.value  = 0.22; hatGain.connect(master);
+
+    // SFXは別ゲイン（少し大きめ）
+    const sfxGain  = ctx.createGain(); sfxGain.gain.value  = 0.26; sfxGain.connect(ctx.destination);
+
+    const scale = [0, 2, 3, 5, 7, 8, 10]; // natural minor
+    const baseMidi = 57; // A3
+    const leadPattern = [0, 3, 5, 7, 5, 3, 2, 0];
+    const bassPattern = [0, 0, 5, 5, 3, 3, 2, 2];
+
+    let bpm = 132;
+    let nextNoteTime = 0;
+    let step = 0;
+    const scheduleAhead = 0.16;
+    const interval = 25;
+    let timer = null;
+    let runningBGM = false;
+
+    const midiToHz = (m) => 440 * Math.pow(2, (m - 69)/12);
+
+    function playLead(t, hz){
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = 'sawtooth';
+      o.frequency.setValueAtTime(hz, t);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.12, t + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.11);
+      o.connect(g); g.connect(leadGain);
+      o.start(t); o.stop(t + 0.12);
+    }
+    function playBass(t, hz){
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = 'triangle';
+      o.frequency.setValueAtTime(hz, t);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.18, t + 0.005);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.14);
+      o.connect(g); g.connect(master);
+      o.start(t); o.stop(t + 0.15);
+    }
+    function playKick(t){
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(120, t);
+      o.frequency.exponentialRampToValueAtTime(45, t + 0.08);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.5, t + 0.005);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.10);
+      o.connect(g); g.connect(drumGain);
+      o.start(t); o.stop(t + 0.11);
+    }
+    function playHat(t){
+      const bufferSize = 2 * ctx.sampleRate;
+      const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+      const output = noiseBuffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) output[i] = Math.random() * 2 - 1;
+
+      const noise = ctx.createBufferSource();
+      noise.buffer = noiseBuffer;
+
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'highpass';
+      filter.frequency.setValueAtTime(7000, t);
+
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.14, t + 0.002);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.045);
+
+      noise.connect(filter);
+      filter.connect(g);
+      g.connect(hatGain);
+
+      noise.start(t);
+      noise.stop(t + 0.05);
+    }
+
+    const nextStepTime = () => (60 / bpm) / 2; // 8th
+
+    function schedule(){
+      if (!runningBGM) return;
+      while (nextNoteTime < ctx.currentTime + scheduleAhead){
+        const t = nextNoteTime;
+
+        const idx = step % 8;
+        const leadHz = midiToHz(baseMidi + 12 + scale[leadPattern[idx] % scale.length]);
+        const bassHz = midiToHz(baseMidi - 12 + scale[bassPattern[idx] % scale.length]);
+
+        if (idx === 0 || idx === 4) playKick(t);
+        playHat(t);
+        playBass(t, bassHz);
+        if (idx % 2 === 0) playLead(t, leadHz);
+
+        nextNoteTime += nextStepTime();
+        step++;
+      }
+    }
+
+    function startBGM(){
+      if (runningBGM) return;
+      runningBGM = true;
+      nextNoteTime = ctx.currentTime + 0.03;
+      step = 0;
+      timer = setInterval(schedule, interval);
+      bgmStateEl.textContent = 'ON';
+    }
+    function stopBGM(){
+      runningBGM = false;
+      if (timer) clearInterval(timer);
+      timer = null;
+      bgmStateEl.textContent = 'OFF';
+    }
+    function setTempo(newBpm){ bpm = newBpm; }
+    function resume(){
+      if (ctx.state === 'suspended') return ctx.resume();
+      return Promise.resolve();
+    }
+
+    // ===== SFX（当たり音）=====
+    // positive: ピコーン（上がる）
+    // negative: ブブー（下がる）
+    function sfxHitPositive(){
+      const t = ctx.currentTime;
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = 'square';
+      o.frequency.setValueAtTime(660, t);
+      o.frequency.exponentialRampToValueAtTime(990, t + 0.10);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.22, t + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
+      o.connect(g); g.connect(sfxGain);
+      o.start(t); o.stop(t + 0.20);
+    }
+
+    function sfxHitNegative(){
+      const t = ctx.currentTime;
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = 'sawtooth';
+      o.frequency.setValueAtTime(220, t);
+      o.frequency.exponentialRampToValueAtTime(140, t + 0.12);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.26, t + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.22);
+      o.connect(g); g.connect(sfxGain);
+      o.start(t); o.stop(t + 0.24);
+    }
+
+    return { ctx, resume, startBGM, stopBGM, setTempo, sfxHitPositive, sfxHitNegative };
+  }
+
+  function ensureAudio(){
+    if (!audio) audio = createAudio();
+    return audio;
+  }
+
+  function updateTempoByWave(){
+    if (!audio) return;
+    if (currentWave >= FAST_TEMPO_START_WAVE) audio.setTempo(168);
+    else audio.setTempo(132);
+  }
+
+  // ====== 終了/リセット ======
+  function endGame(reason){
+    running = false;
+    if (rafId) cancelAnimationFrame(rafId);
+    if (audio) audio.stopBGM();
+
+    overlay.classList.add('show');
+    if (reason === 'dead'){
+      overlayTitle.textContent = 'GAME OVER';
+      overlayText.innerHTML = `スコアが0未満になりました。最終スコア：<b>${score}</b>`;
+      overlayBtn.textContent = 'Retry';
+    } else {
+      overlayTitle.textContent = 'FINISH!';
+      overlayText.innerHTML = `20ウェーブ完走！最終スコア：<b>${score}</b>`;
+      overlayBtn.textContent = 'Play Again';
+    }
+  }
+
+  function clearObjects(){
+    [...game.querySelectorAll('.box, .floatText')].forEach(n => n.remove());
+  }
+
+  function reset(){
+    clearObjects();
+    setScore(100);
+    setWavesLeft(totalWaves);
+    currentWave = 0;
+    activeWaveId = 0;
+    waveHitLocked = false;
+
+    setPlayerLane(1);
+    applyChar();
+
+    running = false;
+    if (rafId) cancelAnimationFrame(rafId);
+    if (audio) audio.stopBGM();
+
+    overlay.classList.add('show');
+    overlayTitle.textContent = 'キャラクターを選んでね';
+    overlayText.innerHTML =
+      `<span class="kbd">←</span> / <span class="kbd">→</span>で移動。<br>
+       1ウェーブ3箱同時（同速）・当たりは1箱だけ。<br>
+       ウェーブ10/15は全マイナス（1つは-1..-9、2つは-30..-49）。<br>
+       最後の5ウェーブでBGMが速くなるよ。`;
+    overlayBtn.textContent = 'Start';
+  }
+
+  // ====== 進行 ======
+  function nextWave(){
+    currentWave = totalWaves - wavesLeft + 1; // 1..20
+    updateTempoByWave();
+
+    spawnWave(currentWave);
+    setWavesLeft(wavesLeft - 1);
+  }
+
+  function start(){
+    if (running) return;
+    running = true;
+    overlay.classList.remove('show');
+
+    clearObjects();
+    setScore(100);
+    setWavesLeft(totalWaves);
+    currentWave = 0;
+    activeWaveId = 0;
+    waveHitLocked = false;
+
+    setPlayerLane(1);
+    applyChar();
+
+    const a = ensureAudio();
+    a.resume().then(() => {
+      updateTempoByWave();
+      a.startBGM();
+    });
+
+    nextWave();
+
+    let last = performance.now();
+    function tick(now){
+      if (!running) return;
+      const dt = (now - last) / 1000;
+      last = now;
+
+      const rect = game.getBoundingClientRect();
+      const playerRect = player.getBoundingClientRect();
+
+      const boxes = [...game.querySelectorAll('.box')];
+      for (const b of boxes){
+        const vps = Number(b.dataset.vps);
+        const top = parseFloat(b.style.top || '-90');
+        b.style.top = `${top + vps * dt}px`;
+
+        const bRect = b.getBoundingClientRect();
+
+        const sameWave = Number(b.dataset.waveId) === activeWaveId;
+        const canCollect = b.dataset.collectable === "1";
+        const laneMatch = Number(b.dataset.lane) === laneIndex;
+        const overlap =
+          bRect.bottom >= playerRect.top + 6 &&
+          bRect.top <= playerRect.bottom - 6;
+
+        if (sameWave && !waveHitLocked && canCollect && laneMatch && overlap){
+          waveHitLocked = true;
+
+          const val = Number(b.dataset.value);
+          const newScore = score + val;
+          setScore(newScore);
+
+          // ★効果音
+          if (audio){
+            if (val >= 0) audio.sfxHitPositive();
+            else audio.sfxHitNegative();
+          }
+
+          const gx = (bRect.left - rect.left) + bRect.width/2 - 18;
+          const gy = (bRect.top - rect.top) + 10;
+          showFloatText(val >= 0 ? `+${val}` : `${val}`, gx, gy);
+          bumpPlayer();
+
+          b.remove();
+
+          // 残り2箱は当たり判定なし＆薄く
+          const rest = [...game.querySelectorAll('.box')].filter(x => Number(x.dataset.waveId) === activeWaveId);
+          for (const r of rest){
+            r.dataset.collectable = "0";
+            r.classList.add('locked');
+          }
+
+          if (newScore < 0){
+            endGame('dead');
+            return;
+          }
+          continue;
+        }
+
+        if (bRect.top > rect.bottom + 40){
+          b.remove();
+        }
+      }
+
+      // このウェーブの箱が全部無くなったら次へ
+      if (running){
+        const remaining = [...game.querySelectorAll('.box')].filter(x => Number(x.dataset.waveId) === activeWaveId).length;
+        if (remaining === 0){
+          if (wavesLeft <= 0){
+            endGame('clear');
+            return;
+          }
+          nextWave();
+        }
+      }
+
+      rafId = requestAnimationFrame(tick);
+    }
+    rafId = requestAnimationFrame(tick);
+  }
+
+  // ====== キャラ選択 ======
+  charPick.addEventListener('click', (e) => {
+    const btn = e.target.closest('.charBtn');
+    if (!btn) return;
+    selectedChar = btn.dataset.char;
+    [...charPick.querySelectorAll('.charBtn')].forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    applyChar();
+  });
+
+  // ====== 操作 ======
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowLeft'){ setPlayerLane(laneIndex - 1); e.preventDefault(); }
+    else if (e.key === 'ArrowRight'){ setPlayerLane(laneIndex + 1); e.preventDefault(); }
+    else if (e.key === ' ' || e.key === 'Enter'){ if (!running) start(); }
+  }, { passive:false });
+
+  startBtn.addEventListener('click', start);
+  overlayBtn.addEventListener('click', start);
+  resetBtn.addEventListener('click', reset);
+  window.addEventListener('resize', () => setPlayerLane(laneIndex));
+
+  // 初期
+  applyChar();
+  setPlayerLane(1);
+  overlay.classList.add('show');
+})();
+</script>
+</body>
+</html>
